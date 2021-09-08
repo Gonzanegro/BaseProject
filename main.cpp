@@ -22,7 +22,11 @@
  * 
  */
 #define INTERVAL    40
-typedef struct{
+/**
+ * @brief estructura que contiene el mapa de bits de las flags que voy a usar en mi programa b0 es para cambiar el estado del led 
+ * b1 es para ver si el jugador gano o perdio y b3 es para esperar un segundo antes de generar el juego 
+ */
+typedef struct{        
     unsigned char b0:1; 
     unsigned char b1:1;
     unsigned char b2:1;
@@ -43,7 +47,10 @@ typedef enum{
     BUTTON_FALLING, //2
     BUTTON_RISING   //3
 }_eButtonState;
-
+/**
+ * @brief estructura que contiene los parametros de los pulsadores "estado" es para ver la posición del pulsador 
+ * timedown es para ver cuanto tiempo estuvo pulsado 
+ */
 
 typedef struct{
     uint8_t estado;
@@ -51,12 +58,12 @@ typedef struct{
     int32_t timeDiff;
 }_sTeclas;
 
-_sFlags myFlags;
-_sTeclas ourButton[NROBOTONES];
+_sFlags myFlags; // variable de tipo estructura 
+_sTeclas ourButton[NROBOTONES]; //array de la estructura teclas 
 // 0001 , 0010,  0100, 1000
-uint16_t mask[]={0x0001,0x0002,0x0004,0x0008,0x000F};
+uint16_t mask[]={0x0001,0x0002,0x0004,0x0008,0x000F}; //mascara para conocer los valores de los buses 
 
-uint8_t estadoJuego=ESPERAR;
+uint8_t estadoJuego=ESPERAR; //variable que maneja la maquina de estados 
 
 
 /**
@@ -68,6 +75,7 @@ _eButtonState myButton;
 /**
  * @brief Inicializa la MEF
  * Le dá un estado inicial a myButton
+ * @param indice Este parámetro le pasa a la MEF botón que tiene que inicializar.
  */
 void startMef(uint8_t indice);
 
@@ -75,19 +83,20 @@ void startMef(uint8_t indice);
  * @brief Máquina de Estados Finitos(MEF)
  * Actualiza el estado del botón cada vez que se invoca.
  * 
- * @param buttonState Este parámetro le pasa a la MEF el estado del botón.
+ * @param indice Este parámetro le pasa a la MEF botón que tiene que actualizar.
  */
 void actuallizaMef(uint8_t indice );
 
 /**
  * @brief Función para cambiar el estado del LED cada vez que sea llamada.
- * 
+ * @param indice Este parámetro le pasa a la funcion el LED que se quiere encender 
+ * @param estate se le pasa a la funcion si desea encender o apagar los leds 
  */
 void togleLed(uint8_t indice,uint8_t estate);
 
 DigitalOut LEDHerbit(PC_13);
-BusIn botones(PB_6,PB_7,PB_8,PB_9);
-BusOut leds(PB_12,PB_13,PB_14,PB_15);
+BusIn botones(PB_6,PB_7,PB_8,PB_9);//bus de entrada (pulsadores )
+BusOut leds(PB_12,PB_13,PB_14,PB_15);//bus de salida (leds )
 
 Timer miTimer; //!< Timer para hacer la espera de 40 milisegundos
 
@@ -99,12 +108,13 @@ int main()
     uint16_t ledAuxRandom=0;
     int tiempoHb=0;
     int tiempoRandom=0;
+    int tiempoPrueba=0;
     int tiempoFin=0;
     int ledAuxRandomTime=0;
     int ledAuxJuegoStart=0;
     int8_t contador=0;
     uint8_t indiceAux=0;
-    for(uint8_t indice=0; indice<NROBOTONES;indice++){
+    for(uint8_t indice=0; indice<NROBOTONES;indice++){ //inicializa los botones 
         startMef(indice);
     }
 
@@ -116,7 +126,7 @@ int main()
             tiempoHb=miTimer.read_ms();
         }  
         
-        switch(estadoJuego){
+        switch(estadoJuego){ //switch principal 
             case ESPERAR:
                 if ((miTimer.read_ms()-tiempoMs)>INTERVAL){
                     tiempoMs=miTimer.read_ms();
@@ -166,25 +176,24 @@ int main()
                             myFlags.b3=0;//paso la flag a 0 para que despues espere otro segundo 
                         }
                     }
-                    for(int i=0;i<NROBOTONES;i++){
-                        actuallizaMef(i);
+                    if( (miTimer.read_ms()-tiempoPrueba) > (INTERVAL)){    
+                        tiempoPrueba=miTimer.read_ms();
+                        for(int i=0;i<NROBOTONES;i++){
+                            actuallizaMef(i);
 
-                        if(ourButton[i].estado == BUTTON_DOWN){ // si el boton esta presionado 
-                            if(i==ledAuxRandom){//gana
-                                myFlags.b1=1;
-                                estadoJuego=JUEGOTERMINADO;
-                            }else{//pierde
-                                myFlags.b1=0;
-                                estadoJuego=JUEGOTERMINADO;
+                            if(ourButton[i].estado == BUTTON_DOWN){ // si el boton esta presionado 
+                                if(i==ledAuxRandom){//gana
+                                    myFlags.b1=1;
+                                }else{//pierde
+                                    myFlags.b1=0;
+                                }
+                            
                             }
-                        
-                        }
-                    }   
-                                        
-                    if((miTimer.read_ms() - tiempoRandom > ledAuxRandomTime) && myFlags.b3){                           
-                            myFlags.b1=0;
-                            estadoJuego=JUEGOTERMINADO;
+                        }   
                     }
+                    if((miTimer.read_ms() - tiempoRandom > ledAuxRandomTime) && myFlags.b3){                       
+                        estadoJuego=JUEGOTERMINADO;
+                        }
                     if(estadoJuego==JUEGOTERMINADO){
                         leds=OFF;
                         tiempoFin=miTimer.read_ms(); //inicializa la variable tiempoFIN para que tenga el valor actual del timer 
@@ -268,10 +277,7 @@ void actuallizaMef(uint8_t indice){
             ourButton[indice].estado=BUTTON_UP;
             //Flanco de Subida
             ourButton[indice].timeDiff=miTimer.read_ms()-ourButton[indice].timeDown;
-           /*
-            if(ourButton[indice].timeDiff >= TIMETOSTART)
-                togleLed(indice);
-                */
+
         }
 
         else
